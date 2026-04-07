@@ -6,7 +6,7 @@ Desenvolvido como parte de um desafio técnico para a vaga de **Analista de IA J
 
 ---
 
-## ⚠️ Observação Importante — Construção da RAG Jurídica
+## ⚠️ Observação Importante ANTES DE COMEÇAR A FALAR SOBRE O AGENTE — Construção da RAG Jurídica
 
 Este projeto utiliza uma base de conhecimento jurídica construída com **RAG (Retrieval-Augmented Generation)**.
 
@@ -98,8 +98,8 @@ foi feita para:
 * Melhorar performance
 * Reduzir custo computacional
 * Simular arquitetura real de produção
-
-
+---
+# RETORNANDO AO PROJETO
 ---
 
 ## 🎯 Objetivo
