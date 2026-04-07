@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Serviço do Banco de Dados
+  db:
+    image: postgres:15
+    container_name: postgres_advogados
+    restart: always
+    environment:
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: senha_segura_123
+      POSTGRES_DB: escritorio_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # Script de inicialização para criar a tabela e os 4 advogados automaticamente
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rede_juridica
+
+  # Serviço da sua IA (Streamlit + LangChain)
+  app:
+    build: .
+    container_name: chatbot_juridico
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - rede_juridica
+
+networks:
+  rede_juridica:
+    driver: bridge
+
+volumes:
+  postgres_data:
