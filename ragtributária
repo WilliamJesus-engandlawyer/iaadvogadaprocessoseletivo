@@ -1,7 +1,11 @@
 # ============================================================
-# RAG JURÍDICA v2.0 — Tributário & Administrativo
+# RAG JURÍDICA - Tributário & Administrativo
 # Otimizada para Google Colab (GPU T4/A100)
 # ============================================================
+
+# NÃO FOI FEITO PARA EXECUTAR COM O DOCKER IGNORAR, ISSO AQUI É A RAG
+# COMO ELA FOI FEITA NO GOOGLE COLLAB, ESSE CÓDIGO SE EXECUTA LÁ
+
 
 # ============================================================
 # CÉLULA 1 — Instalação das dependências
@@ -9,6 +13,7 @@
 # IMPORTANTE: reinicie o runtime após esta célula!
 
 # numpy 1.26.4 primeiro (evita conflito com lancedb)
+"""
 import subprocess
 subprocess.run(["pip", "install", "numpy==1.26.4", "--force-reinstall", "-q"], check=True)
 
@@ -458,3 +463,4 @@ if __name__ == "__main__":
 
     tbl_proc = cria_tabela_processos(dados_mock)
     busca_processo("IPTU não pago com prazo para defesa")
+"""
