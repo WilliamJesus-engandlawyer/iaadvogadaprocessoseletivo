@@ -6,6 +6,102 @@ Desenvolvido como parte de um desafio técnico para a vaga de **Analista de IA J
 
 ---
 
+## ⚠️ Observação Importante — Construção da RAG Jurídica
+
+Este projeto utiliza uma base de conhecimento jurídica construída com **RAG (Retrieval-Augmented Generation)**.
+
+A etapa de criação dessa base **não é executada dentro do Docker**, pois foi desenvolvida separadamente no **Google Colab**, devido à necessidade de processamento intensivo (embeddings, parsing de PDFs e indexação vetorial).
+
+---
+
+### 🧠 Como a RAG foi construída
+
+A base jurídica foi gerada a partir de:
+
+* 📄 PDFs legais (Constituição, CTN, leis tributárias, etc.)
+* 📚 Base de conceitos jurídicos estruturados (70+ conceitos)
+* 🔍 Processamento inteligente de texto (artigos, incisos, parágrafos)
+
+---
+
+### ⚙️ Pipeline da RAG
+
+O processo segue múltiplas etapas avançadas:
+
+1. **Extração de texto de PDFs**
+
+   * Utilizando `pdfplumber`
+
+2. **Chunking jurídico hierárquico**
+
+   * Separação por:
+
+     * Artigos
+     * Parágrafos
+     * Incisos
+
+3. **Geração de embeddings**
+
+   * Modelo: `intfloat/multilingual-e5-large-instruct`
+
+4. **Indexação vetorial**
+
+   * Banco: LanceDB
+
+5. **Busca híbrida**
+
+   * Vetorial (semântica)
+   * BM25 (palavras-chave)
+
+6. **Reranking**
+
+   * Modelo: Cross-Encoder (`ms-marco` otimizado)
+
+---
+
+### 🔎 Estratégia de Busca
+
+A recuperação de informações segue:
+
+* Busca semântica (similaridade)
+* Busca lexical (BM25)
+* Fusão de scores
+* Reclassificação (reranking)
+
+Isso garante maior precisão em consultas jurídicas complexas.
+
+---
+
+### 📁 Onde isso aparece no projeto?
+
+* A base gerada é utilizada pelo agente via leitura de arquivos na pasta `/data`
+* O código completo de construção da RAG está incluído no repositório **apenas para referência técnica**
+
+---
+
+### 🚫 Importante
+
+* Este código **não precisa ser executado para rodar o projeto**
+* O sistema já funciona com a base previamente construída
+
+---
+
+### 💡 Decisão Técnica
+
+A separação entre:
+
+* **Construção da RAG (offline)**
+* **Uso da RAG (online no agente)**
+
+foi feita para:
+
+* Melhorar performance
+* Reduzir custo computacional
+* Simular arquitetura real de produção
+
+
+---
+
 ## 🎯 Objetivo
 
 Construir um assistente inteligente que:
