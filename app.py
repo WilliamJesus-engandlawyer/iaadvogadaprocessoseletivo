@@ -1,6 +1,7 @@
 import os
 import glob
 import smtplib
+import re
 import streamlit as st
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -61,6 +62,34 @@ def load_rag_knowledge(data_dir: str = "data") -> str:
         return "(Nenhum documento encontrado na pasta 'data'.)"
     return "\n\n---\n\n".join(docs)[:30_000]
 
+# ─────────────────────────────────────────────
+# 3. não passar dados sensiveis a llm. (lgpd)
+# ─────────────────────────────────────────────
+
+def mask_pii(text: str) -> str:
+    """ Substitui CPFs e Telefones por rótulos genéricos antes de enviar ao LLM. """
+    # Regex para CPF (formatado ou apenas números)
+    text = re.sub(r'\d{3}\.?\d{3}\.?\d{3}-?\d{2}', '[CPF_OCULTO]', text)
+    
+    # Regex para Telefone (celulares com DDD e diferentes formatos)
+    text = re.sub(r'\(?\d{2}\)?\s?9?\d{4}-?\d{4}', '[TELEFONE_OCULTO]', text)
+    
+    return text
+
+# ─────────────────────────────────────────────
+#  guardrail ante para não ter fraudes
+# ─────────────────────────────────────────────
+
+def check_hard_guardrails(user_input: str) -> bool:
+    """Verifica se há palavras bloqueadas antes de processar."""
+    blacklist = [
+        "falsificar", "fraudar", "nota fria", "lavagem de dinheiro", 
+        "esquema", "burlar o sistema", "sonegar", "mentir no processo"
+    ]
+    for term in blacklist:
+        if term in user_input.lower():
+            return True
+    return False
 
 # ─────────────────────────────────────────────
 # 4. ENVIO DE EMAIL (isolado — fácil de trocar)
@@ -161,14 +190,29 @@ def salvar_dados_e_agendar(
     """
     Salva os dados do cliente no banco de dados E envia email de notificação.
     Use SOMENTE após o cliente confirmar o agendamento E fornecer nome, CPF e telefone.
-    Parâmetros:
-      - nome: nome completo do cliente.
-      - cpf: CPF do cliente (somente números ou formatado).
-      - telefone: telefone/celular do cliente com DDD.
-      - advogado: nome do advogado escolhido.
-      - horario: horário/período confirmado.
     """
-    # Salva no banco
+    
+    # ──────── PULO DO GATO: RECUPERAÇÃO DOS DADOS REAIS ────────
+    # Se a IA tentar passar o rótulo mascarado, buscamos o valor real no histórico
+    if cpf == "[CPF_OCULTO]" or telefone == "[TELEFONE_OCULTO]":
+        # Pegamos apenas as mensagens que o usuário digitou
+        mensagens_usuario = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
+        if mensagens_usuario:
+            # Analisamos a última mensagem do usuário (onde geralmente estão os dados)
+            ultimo_texto_bruto = mensagens_usuario[-1]
+            
+            if cpf == "[CPF_OCULTO]":
+                match_cpf = re.search(r'\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{11}', ultimo_texto_bruto)
+                if match_cpf:
+                    cpf = match_cpf.group()
+            
+            if telefone == "[TELEFONE_OCULTO]":
+                match_tel = re.search(r'\(?\d{2}\)?\s?9?\d{4}-?\d{4}|\d{10,11}', ultimo_texto_bruto)
+                if match_tel:
+                    telefone = match_tel.group()
+    # ──────────────────────────────────────────────────────────
+
+    # Salva no banco (Sua lógica original preservada)
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -186,7 +230,7 @@ def salvar_dados_e_agendar(
         print(f"[DB SAVE ERROR] {e}")
         db_status = "⚠️ Problema ao salvar no banco. Nossa equipe foi avisada."
 
-    # Envia email
+    # Envia email (Sua lógica original preservada)
     email_ok = enviar_email(nome, cpf, telefone, advogado, horario)
     email_status = (
         "✅ Notificação enviada para a equipe."
@@ -347,31 +391,45 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+
 if user_input := st.chat_input("Descreva sua situação tributária ou jurídica..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
+        # Primeiro verifica fraude (Guardrail)
+        if check_hard_guardrails(user_input):
+            full_response = "⚠️ **Aviso de Ética:** Detectamos termos que violam nossas diretrizes de conformidade. Não prestamos consultoria para práticas ilícitas. O atendimento foi encerrado."
+            st.error(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            st.stop()
+
+        # 2. Se passou no guardrail, agora aplicamos o PII Masking e chamamos o Agente
         with st.spinner("Analisando sua situação..."):
+            input_mascarado = mask_pii(user_input)
+            
+            # Mascaramos o histórico também para garantir segurança total no envio
             history = []
             for m in st.session_state.messages[:-1]:
                 if m["role"] == "user":
-                    history.append(HumanMessage(content=m["content"]))
+                    history.append(HumanMessage(content=mask_pii(m["content"])))
                 else:
                     history.append(AIMessage(content=m["content"]))
+
             try:
+                # O agente agora trabalha com a versão SEGURA (mascarada)
                 response = st.session_state.agent_executor.invoke({
-                    "input": user_input,
+                    "input": input_mascarado,
                     "chat_history": history,
                 })
                 full_response = response["output"]
             except Exception as e:
+                print(f"[AGENT ERROR] {e}")
                 full_response = (
                     "Desculpe, tive um problema técnico. "
                     "Por favor, tente novamente ou aguarde contato da nossa equipe."
                 )
-                print(f"[AGENT ERROR] {e}")
 
         st.markdown(full_response)
         st.session_state.messages.append({"role": "assistant", "content": full_response})
